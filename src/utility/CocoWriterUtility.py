@@ -171,7 +171,7 @@ class CocoWriterUtility:
             instance_2_category_map = {}
             for inst in inst_attribute_map:
                 # skip background
-                if int(inst["category_id"]) != 0:
+                if int(inst["category_id"]) != 0: #######################*********************************************###############################################
                     # take all objects or objects from specified supercategory is defined
                     inst_supercategory = "coco_annotations"
                     if "bop_dataset_name" in inst:
@@ -228,15 +228,26 @@ class CocoWriterUtility:
             for inst in instances:
                 if inst in instance_2_category_map:
                     # Calc object mask
+                    #ő kiszámolja az oadott objektumhoz tartozó maszkot
                     binary_inst_mask = np.where(inst_segmap == inst, 1, 0)
-                    # Add coco info for object in this image
-                    annotation = CocoWriterUtility.create_annotation_info(len(annotations),
+                    connectivity = 4  # You need to choose 4 or 8 for connectivity type  
+                    binary_int8 = binary_inst_mask.astype(np.int8)
+                    #mi kiszámoljuk az adott objektumhoz tartozó maszk komponenseit
+                    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary_int8 , connectivity , cv2.CV_8S)
+                    
+                    #ezekből num_labels darab van, amiből a első a maszk. Az összes komponens maskja egyszerre bele van írva a labels be, mindegyik maszk másik számmal
+                    for component_Id in range(1,num_labels):
+                        # Add coco info for object in this image
+                        #minden komponensre az adott komponenshez tartozó maszkot válasszuk ki a lbels ből
+                        binary_inst_mask = np.where(labels == component_Id, 1, 0)
+                        #minden kiválasztott komponens maszkjára hívjuk meg ugyanazt a dolgot, amit eredetileg az egész tárgy nem feltétlenül összefüggő maszkjára hívtunk
+                        annotation = CocoWriterUtility.create_annotation_info(len(annotations),
                                                                     image_id,
                                                                     instance_2_category_map[inst],
                                                                     binary_inst_mask,
                                                                     mask_encoding_format)
-                    if annotation is not None:
-                        annotations.append(annotation)
+                        if annotation is not None:
+                            annotations.append(annotation)
 
         new_coco_annotations = {
             "info": info,
@@ -361,6 +372,7 @@ class CocoWriterUtility:
         h = rmax - rmin + 1
         w = cmax - cmin + 1
         return [int(cmin), int(rmin), int(w), int(h)]
+
 
     @staticmethod
     def calc_binary_mask_area(binary_mask):
